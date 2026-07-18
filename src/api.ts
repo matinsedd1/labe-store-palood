@@ -2,11 +2,33 @@ import { Product } from './types';
 
 export async function fetchSheetData(spreadsheetId: string): Promise<Product[]> {
   const res = await fetch(`/api/sheets/${spreadsheetId}`);
-  if (!res.ok) {
-    let errorMsg = 'Failed to fetch sheet data'; try { const error = await res.json(); errorMsg = error.error || errorMsg; } catch(e) { errorMsg = `Server error (${res.status})`; } throw new Error(errorMsg);
+  let text = '';
+  try {
+    text = await res.text();
+  } catch(e) {
+    throw new Error('Failed to read response body');
   }
 
-  const rows: string[][] = await res.json();
+  if (!res.ok) {
+    let errorMsg = 'Failed to fetch sheet data';
+    try {
+      const error = JSON.parse(text);
+      errorMsg = error.error || errorMsg;
+    } catch(e) {
+      console.error('Raw error response:', text);
+      errorMsg = `Server error (${res.status}): ${text.substring(0, 100)}`;
+    }
+    throw new Error(errorMsg);
+  }
+
+  let rows: string[][] = [];
+  try {
+    rows = JSON.parse(text);
+  } catch(e) {
+    console.error('Failed to parse JSON, raw response:', text);
+    throw new Error('Invalid JSON response from server');
+  }
+
   if (!rows || rows.length === 0) return [];
 
   // Parse headers
@@ -72,11 +94,32 @@ export async function fetchSheetData(spreadsheetId: string): Promise<Product[]> 
 
 export async function fetchLogs(spreadsheetId: string) {
   const res = await fetch(`/api/sheets/${spreadsheetId}/logs`);
-  if (!res.ok) {
-    let errorMsg = 'Failed to fetch logs'; try { const error = await res.json(); errorMsg = error.error || errorMsg; } catch(e) { errorMsg = `Server error (${res.status})`; } throw new Error(errorMsg);
+  
+  let text = '';
+  try {
+    text = await res.text();
+  } catch(e) {
+    throw new Error('Failed to read response body');
   }
-  const rows = await res.json();
-  return rows;
+
+  if (!res.ok) {
+    let errorMsg = 'Failed to fetch logs';
+    try {
+      const error = JSON.parse(text);
+      errorMsg = error.error || errorMsg;
+    } catch(e) {
+      console.error('Raw error response:', text);
+      errorMsg = `Server error (${res.status}): ${text.substring(0, 100)}`;
+    }
+    throw new Error(errorMsg);
+  }
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('Failed to parse JSON, raw response:', text);
+    throw new Error('Invalid JSON response from server');
+  }
 }
 
 export async function appendLog(spreadsheetId: string, action: string, product: Product) {
@@ -92,8 +135,30 @@ export async function appendLog(spreadsheetId: string, action: string, product: 
       price: product.sellingPrice,
     }),
   });
-  if (!res.ok) {
-    let errorMsg = 'Failed to append log'; try { const error = await res.json(); errorMsg = error.error || errorMsg; } catch(e) { errorMsg = `Server error (${res.status})`; } throw new Error(errorMsg);
+
+  let text = '';
+  try {
+    text = await res.text();
+  } catch(e) {
+    throw new Error('Failed to read response body');
   }
-  return res.json();
+
+  if (!res.ok) {
+    let errorMsg = 'Failed to append log';
+    try {
+      const error = JSON.parse(text);
+      errorMsg = error.error || errorMsg;
+    } catch(e) {
+      console.error('Raw error response:', text);
+      errorMsg = `Server error (${res.status}): ${text.substring(0, 100)}`;
+    }
+    throw new Error(errorMsg);
+  }
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('Failed to parse JSON, raw response:', text);
+    throw new Error('Invalid JSON response from server');
+  }
 }
