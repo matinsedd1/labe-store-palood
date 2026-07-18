@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Palood Phakhsh</string>
+    <string name="title_activity_main">Palood Phakhsh</string>
+    <string name="package_name">com.palood.labelprinter</string>
+    <string name="custom_url_scheme">com.palood.labelprinter</string>
+</resources>
