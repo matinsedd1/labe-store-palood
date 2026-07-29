@@ -4,7 +4,7 @@ import { Product } from '../types';
 import { Search, RefreshCw, Camera, Keyboard, X, Printer, Loader2 } from 'lucide-react';
 import CameraScanner from './CameraScanner';
 import LabelPreview, { ThermalLabelUI } from './LabelPreview';
-import { generateRotatedPdfBase64 } from '../utils/pdfPrint';
+import { generatePdfBase64 } from '../utils/pdfPrint';
 
 interface PrintQueueItem {
   id: string;
@@ -66,7 +66,7 @@ export default function Dashboard({ products, onRefresh, loading, spreadsheetId 
         
         if (elements.length > 0) {
           console.log("Found elements:", elements.length);
-          const pdfBase64 = await generateRotatedPdfBase64(elements);
+          const pdfBase64 = await generatePdfBase64(elements);
           setPreviewPdfBase64(pdfBase64);
         } else {
            console.warn('No labels found for printing');
@@ -347,7 +347,7 @@ export default function Dashboard({ products, onRefresh, loading, spreadsheetId 
             <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <h2 className="font-bold flex items-center gap-2">
                 <Search className="w-5 h-5 text-blue-600" />
-                ویرایشگر لیبل حرارتی (80x40mm)
+                ویرایشگر لیبل حرارتی (72×40mm)
               </h2>
             </div>
             <div className="flex-1 bg-slate-200 dark:bg-slate-900 p-8 flex flex-col items-center justify-center text-slate-400 overflow-hidden text-center">

@@ -61,6 +61,8 @@ export default function CameraScanner({ onScan }: CameraScannerProps) {
             gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
             osc.start();
             osc.stop(ctx.currentTime + 0.1);
+            // Close AudioContext after playback to prevent memory leak
+            osc.onended = () => ctx.close();
           } catch(e) {}
           
           setTimeout(() => {

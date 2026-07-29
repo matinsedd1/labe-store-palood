@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { generateRotatedPdfBase64 } from '../utils/pdfPrint';
+import { generatePdfBase64 } from '../utils/pdfPrint';
 import { Product } from '../types';
 import { Printer, Loader2 } from 'lucide-react';
 import Barcode from 'react-barcode';
 import { appendLog } from '../api';
 import { tomanIcon, oldPriceIcon, badgeBg } from "../utils/images";
+import { toPersianDigits, formatPricePersian, parsePrice, isValidEAN } from '../utils/formatters';
 
 interface LabelPreviewProps {
   product: Product;
@@ -33,12 +34,6 @@ const AutoTextScaler = ({ text }: { text: string }) => {
     }
   }, [text]);
 
-  
-  const isValidEAN = (barcode: string | undefined | null) => {
-    if (!barcode) return false;
-    return /^\d{12,13}$/.test(barcode.trim());
-  };
-
   return (
     <div ref={containerRef} className="w-full overflow-hidden text-right whitespace-nowrap" dir="rtl">
       <span ref={textRef} className="font-bold inline-block leading-tight">
@@ -48,46 +43,38 @@ const AutoTextScaler = ({ text }: { text: string }) => {
   );
 };
 
+/**
+ * Renders the product date: uses productionDate or expirationDate from the product
+ * if available, otherwise falls back to today's date.
+ */
+const getProductDate = (product: Product): string => {
+  if (product.expirationDate) {
+    return product.expirationDate;
+  }
+  if (product.productionDate) {
+    return product.productionDate;
+  }
+  // Fallback to today's date in Persian calendar
+  return new Date().toLocaleDateString('fa-IR').replace(/\//g, '.');
+};
+
 export const ThermalLabelUI = ({ product }: { product: Product }) => {
-  const parsePrice = (priceStr: string | undefined | null) => {
-    if (!priceStr) return 0;
-    return Number(priceStr.replace(/[^0-9]/g, ''));
-  };
-
-  const toPersianDigits = (str: string | number | undefined | null) => {
-    if (!str) return '';
-    const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-    return str.toString().replace(/\d/g, (x) => persianDigits[parseInt(x)]);
-  };
-
-  const formatPricePersian = (price: string | number | undefined | null) => {
-    if (!price) return '';
-    const num = Number(price.toString().replace(/\D/g, ''));
-    if (isNaN(num) || num === 0) return toPersianDigits(price);
-    return num.toLocaleString('fa-IR');
-  };
-
   const sellingPriceNum = parsePrice(product.sellingPrice);
   const consumerPriceNum = parsePrice(product.consumerPrice);
   const hasDiscount = sellingPriceNum > 0 && consumerPriceNum > 0 && sellingPriceNum < consumerPriceNum;
 
-  const isValidEAN = (barcode: string | undefined | null) => {
-    if (!barcode) return false;
-    return /^\d{12,13}$/.test(barcode.trim());
-  };
-
   return (
     <div className="bg-white relative print:border-none print:shadow-none mx-auto overflow-hidden batch-printable printable-label" 
-         style={{ width: '80mm', height: '45mm', direction: 'rtl' }}>
+         style={{ width: '72mm', height: '40mm', direction: 'rtl' }}>
          
       <div 
-        className="w-full h-[48mm] bg-white text-black box-border flex flex-col justify-between overflow-hidden p-[3mm] break-inside-avoid print:break-inside-avoid"
+        className="w-full h-full bg-white text-black box-border flex flex-col justify-between overflow-hidden p-[2.5mm] break-inside-avoid print:break-inside-avoid"
         style={{ fontFamily: '"Vazirmatn", "IRANSansX", sans-serif', direction: 'rtl' }}
       >
         {/* 1. Header: Product Name & Code */}
-        <div className="flex flex-col items-start leading-tight mb-2 w-full shrink-0 mt-[2px]">
+        <div className="flex flex-col items-start leading-tight mb-1 w-full shrink-0 mt-[1px]">
           <AutoTextScaler text={toPersianDigits(product.name || 'نام کالا نامشخص')} />
-          <span className="text-[12px] pt-[1px] font-medium text-black mt-0.5">
+          <span className="text-[11px] pt-[1px] font-medium text-black mt-0.5">
             {toPersianDigits(product.code || '')}
           </span>
         </div>
@@ -95,7 +82,7 @@ export const ThermalLabelUI = ({ product }: { product: Product }) => {
         {/* 2. Middle Row: Prices & Discount Badge */}
         <div className="flex-1 flex justify-between items-start w-full mt-0 mb-0">
           {/* Discount Badge (Right) */}
-          <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: '90px', height: '58px', marginTop: '-4px' }}>
+          <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: '80px', height: '50px', marginTop: '-2px' }}>
             {(() => {
               const isOldPrice = product.isOldPrice;
               const showDiscount = hasDiscount && product.discountPercentage && product.discountPercentage !== '0' && product.discountPercentage !== '0.00%' && product.discountPercentage !== '0%';
@@ -105,13 +92,13 @@ export const ThermalLabelUI = ({ product }: { product: Product }) => {
                   <>
                     <img src={oldPriceIcon} alt="قیمت قدیم" className="w-full h-full object-contain print:color-adjust-exact" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
                     <div 
-                      className="absolute -top-1 -left-2 w-[34px] h-[34px] -ml-[10px] -mt-[8px] mb-0 rounded-full bg-gray-300 flex items-center justify-center z-10 print:color-adjust-exact"
+                      className="absolute -top-1 -left-2 w-[30px] h-[30px] -ml-[8px] -mt-[6px] mb-0 rounded-full bg-gray-300 flex items-center justify-center z-10 print:color-adjust-exact"
                       style={{ 
                         WebkitPrintColorAdjust: 'exact',
                         printColorAdjust: 'exact'
                       }}
                     >
-                      <span className="text-[16px] font-black leading-none text-black print:text-black mt-0.5" dir="ltr" style={{ WebkitTextFillColor: 'black' }}>
+                      <span className="text-[14px] font-black leading-none text-black print:text-black mt-0.5" dir="ltr" style={{ WebkitTextFillColor: 'black' }}>
                         {toPersianDigits(Math.round(parseFloat(product.discountPercentage as string)))}٪
                       </span>
                     </div>
@@ -124,14 +111,14 @@ export const ThermalLabelUI = ({ product }: { product: Product }) => {
                   <div 
                     className="flex flex-col items-center justify-center bg-no-repeat bg-contain bg-center print:color-adjust-exact mt-0 mb-0"
                     style={{ 
-                      width: '66px', 
-                      height: '49px',
+                      width: '58px', 
+                      height: '42px',
                       backgroundImage: `url(${badgeBg})`,
                       WebkitPrintColorAdjust: 'exact',
                       printColorAdjust: 'exact'
                     }}
                   >
-                    <span className="text-[24px] font-black leading-none text-white print:text-white mt-1" dir="ltr" style={{ WebkitTextFillColor: 'white' }}>
+                    <span className="text-[20px] font-black leading-none text-white print:text-white mt-1" dir="ltr" style={{ WebkitTextFillColor: 'white' }}>
                       {toPersianDigits(Math.round(parseFloat(product.discountPercentage as string)))}٪
                     </span>
                   </div>
@@ -143,72 +130,63 @@ export const ThermalLabelUI = ({ product }: { product: Product }) => {
           </div>
 
           {/* Prices (Left) */}
-          <div className="flex flex-col items-end mr-auto shrink-0 -mt-[5px]">
+          <div className="flex flex-col items-end mr-auto shrink-0 -mt-[3px]">
             {hasDiscount ? (
               <>
                 {/* Old Price */}
-                <div className="flex items-center gap-1.5 -mt-[3px] mb-0 pt-[5px]">
-                  <span className="text-[19px] font-medium text-black/70 leading-none line-through decoration-slate-600 decoration-2">
+                <div className="flex items-center gap-1 -mt-[2px] mb-0 pt-[3px]">
+                  <span className="text-[16px] font-medium text-black/70 leading-none line-through decoration-slate-600 decoration-2">
                     {formatPricePersian(product.consumerPrice)}
                   </span>
-                  <img src={tomanIcon} alt="تومان" className="w-[17px] h-[17px] object-contain opacity-60" />
+                  <img src={tomanIcon} alt="تومان" className="w-[14px] h-[14px] object-contain opacity-60" />
                 </div>
                 {/* New Price */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[40px] font-black tracking-tighter leading-none">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[34px] font-black tracking-tighter leading-none">
                     {formatPricePersian(product.sellingPrice)}
                   </span>
-                  <img src={tomanIcon} alt="تومان" className="w-[30px] h-[30px] object-contain" />
+                  <img src={tomanIcon} alt="تومان" className="w-[24px] h-[24px] object-contain" />
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-[40px] font-black tracking-tighter leading-none">
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="text-[34px] font-black tracking-tighter leading-none">
                   {formatPricePersian(product.sellingPrice) || '-'}
                 </span>
-                {product.sellingPrice && <img src={tomanIcon} alt="تومان" className="w-[30px] h-[30px] object-contain" />}
+                {product.sellingPrice && <img src={tomanIcon} alt="تومان" className="w-[24px] h-[24px] object-contain" />}
               </div>
             )}
           </div>
         </div>
 
         {/* 3. Footer: Date & Barcode */}
-        <div className="flex justify-between items-end w-full shrink-0 mt-0 mb-[2px] pb-1">
-          {/* Bottom Right: Barcode */}
+        <div className="flex justify-between items-end w-full shrink-0 mt-0 mb-[1px] pb-0.5">
+          {/* Bottom Right: Barcode — uses CODE128 format with width=2 */}
           <div className="flex flex-col items-center break-inside-avoid print:break-inside-avoid">
             {product.barcode ? (
-              isValidEAN(product.barcode) ? (
-                <div className="flex flex-col items-center justify-center shrink-0" style={{ maxWidth: '100%' }}>
-                  <div className="font-normal flex items-center justify-center shrink-0" dir="ltr">
-                    <Barcode 
-                       value={product.barcode.trim()} 
-                       format="EAN13"
-                       width={1.4} 
-                       height={35} 
-                       margin={2} 
-                       background="transparent" 
-                       lineColor="#000000"
-                       displayValue={true}
-                       fontSize={11}
-                    />
-                  </div>
+              <div className="flex flex-col items-center justify-center shrink-0" style={{ maxWidth: '100%' }}>
+                <div className="font-normal flex items-center justify-center shrink-0" dir="ltr">
+                  <Barcode 
+                     value={product.barcode.trim()} 
+                     format="CODE128"
+                     width={2} 
+                     height={30} 
+                     margin={1} 
+                     background="transparent" 
+                     lineColor="#000000"
+                     displayValue={true}
+                     fontSize={10}
+                  />
                 </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center border border-dashed border-gray-400 p-1 rounded min-w-[30mm] h-[30px]">
-                  <div className="text-[8px] font-bold text-red-600 mb-[2px]">بارکد ۱۳ رقمی نیست</div>
-                  <span className="text-[10px] font-medium text-black" style={{ fontFamily: 'Arial, sans-serif', letterSpacing: '2px' }} dir="ltr">
-                    {product.barcode}
-                  </span>
-                </div>
-              )
+              </div>
             ) : (
               <div className="text-[10px] font-medium">بدون بارکد</div>
             )}
           </div>
 
-          {/* Bottom Left: Date */}
-          <div className="text-[11px] font-medium text-black leading-none mb-1">
-            {toPersianDigits(new Date().toLocaleDateString('fa-IR').replace(/\//g, '.'))}
+          {/* Bottom Left: Date — uses product date fields instead of today */}
+          <div className="text-[10px] font-medium text-black leading-none mb-0.5">
+            {toPersianDigits(getProductDate(product))}
           </div>
         </div>
       </div>
@@ -232,15 +210,11 @@ const handlePrint = async () => {
     try {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
-      // We need to render the portal. Since LabelPreview doesn't control the portal (Dashboard does),
-      // we can just dispatch a custom event or we can just append a temporary printable label to body.
-      // Wait! Dashboard passes `isBatchPrinting` as a prop, but LabelPreview doesn't trigger it.
-      
       if (isMobile) {
         await new Promise(resolve => setTimeout(resolve, 100));
         const element = document.querySelector('#single-print-label-container .printable-label') as HTMLElement;
         if (element) {
-          const pdfBase64 = await generateRotatedPdfBase64([element]);
+          const pdfBase64 = await generatePdfBase64([element]);
           setPreviewPdfBase64(pdfBase64);
           setIsPrinting(false);
         } else {
@@ -249,7 +223,6 @@ const handlePrint = async () => {
         }
       } else {
         // Desktop single print
-        // Hide root and show only the label by moving it to body temporarily
         const label = document.querySelector('#single-print-label-container .printable-label');
         if (label) {
             const clone = label.cloneNode(true) as HTMLElement;
@@ -303,40 +276,16 @@ const handlePrint = async () => {
     setEditableProduct(prev => ({ ...prev, [field]: value }));
   };
 
-  const parsePrice = (priceStr: string | undefined | null) => {
-    if (!priceStr) return 0;
-    return Number(priceStr.replace(/[^0-9]/g, ''));
-  };
-
-  const toPersianDigits = (str: string | number | undefined | null) => {
-    if (!str) return '';
-    const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-    return str.toString().replace(/\d/g, (x) => persianDigits[parseInt(x)]);
-  };
-
-  const formatPricePersian = (price: string | number | undefined | null) => {
-    if (!price) return '';
-    const num = Number(price.toString().replace(/\D/g, ''));
-    if (isNaN(num) || num === 0) return toPersianDigits(price);
-    return num.toLocaleString('fa-IR');
-  };
-
   const sellingPriceNum = parsePrice(editableProduct.sellingPrice);
   const consumerPriceNum = parsePrice(editableProduct.consumerPrice);
   const hasDiscount = sellingPriceNum > 0 && consumerPriceNum > 0 && sellingPriceNum < consumerPriceNum;
-
-  
-  const isValidEAN = (barcode: string | undefined | null) => {
-    if (!barcode) return false;
-    return /^\d{12,13}$/.test(barcode.trim());
-  };
 
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden h-full">
       <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between print:hidden">
         <h2 className="font-bold flex items-center gap-2">
           <Printer className="w-5 h-5 text-blue-600" />
-          ویرایشگر لیبل حرارتی (80x48mm)
+          ویرایشگر لیبل حرارتی (72×40mm)
         </h2>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 border border-slate-200 dark:border-slate-600">
@@ -380,7 +329,7 @@ const handlePrint = async () => {
               <div className="border border-slate-200 dark:border-slate-700 p-2 rounded-lg bg-slate-50 dark:bg-slate-900 mb-6 flex justify-center items-center w-full">
                 <iframe 
                   src={`data:application/pdf;base64,${previewPdfBase64}#toolbar=0&navpanes=0&scrollbar=0`}
-                  className="w-[58mm] h-[78mm] bg-white shadow-sm mx-auto"
+                  className="w-[72mm] h-[40mm] bg-white shadow-sm mx-auto"
                   title="PDF Preview"
                 />
               </div>

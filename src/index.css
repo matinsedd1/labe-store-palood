@@ -3,18 +3,6 @@
 
   @variant dark (&:where(.dark, .dark *));
 
-
-
-
-
-
-
-
-
-
-
-
-
 @theme {
   --font-sans: "Vazirmatn", "IRANSansX", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
@@ -25,28 +13,34 @@
   }
 }
 
+/* ============================================================
+   Woosim WSP-R350 Thermal Printer — Print Styles
+   - Print width: 72mm (576px at 203 DPI)
+   - Label height: 40mm
+   - NO software rotation — printer handles orientation natively
+   ============================================================ */
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  
-  @page { 
-    size: 48mm 80mm; 
-    margin: 0 !important; 
+
+  @page {
+    size: 72mm 40mm;
+    margin: 0 !important;
   }
-  
+
   html, body {
-    width: 48mm !important;
-    height: auto !important; /* بسیار حیاتی برای آزادسازی ارتفاع */
+    width: 72mm !important;
+    height: auto !important;
     min-height: 100% !important;
-    overflow: visible !important; /* بسیار حیاتی برای جلوگیری از قیچی شدن صفحات */
-    display: block !important; /* شکستن محدودیت‌های Flexbox */
+    overflow: visible !important;
+    display: block !important;
     margin: 0 !important;
     padding: 0 !important;
     background-color: #ffffff !important;
   }
-  
+
   /* Hide all non-essential elements */
   body > *:not(#root):not(.batch-print-portal),
   .print\:hidden {
@@ -60,22 +54,21 @@
 
   #root {
     width: 100% !important;
-    height: auto !important; /* بسیار حیاتی */
+    height: auto !important;
     min-height: 100% !important;
-    overflow: visible !important; /* بسیار حیاتی */
-    display: block !important; /* شکستن محدودیت‌های Flexbox در React */
+    overflow: visible !important;
+    display: block !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
+  /* Label container — NO rotation, direct 72mm × 40mm output */
   .printable-label {
-    position: fixed !important;
+    position: relative !important;
     top: 0 !important;
     left: 0 !important;
-    transform-origin: 24mm 24mm !important;
-    transform: rotate(90deg) !important;
-    width: 80mm !important;
-    height: 48mm !important; /* matches 48mm width when rotated */
+    width: 72mm !important;
+    height: 40mm !important;
     margin: 0 !important;
     padding: 0 !important;
     background-color: #ffffff !important;
@@ -88,7 +81,7 @@
   }
 
   /* Optimize colors and contrast: pure black and white */
-    .printable-label * {
+  .printable-label * {
     color: #000000 !important;
     border-color: #000000 !important;
     -webkit-print-color-adjust: exact !important;
@@ -99,12 +92,13 @@
   .printable-label .bg-white {
     background-color: #ffffff !important;
   }
-  
+
   .printable-label .bg-black {
     background-color: #000000 !important;
     color: #ffffff !important;
   }
 }
+
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
@@ -131,11 +125,11 @@
 }
 
 @media print {
-  /* ۱. کانتینر هر صفحه: دقیقاً ابعاد یک کاغذ فیزیکی پرینتر */
+  /* Batch page wrapper: exact physical page dimensions for Woosim WSP-R350 */
   .batch-page-wrapper {
     position: relative !important;
-    width: 48mm !important;
-    height: 80mm !important;
+    width: 72mm !important;
+    height: 40mm !important;
     page-break-after: always !important;
     break-after: page !important;
     margin: 0 !important;
@@ -143,24 +137,20 @@
     overflow: visible !important;
   }
 
-  /* ۲. لیبل: قفل شدن در نقطه صفر و چرخش هندسی دقیق */
-
   .batch-print-portal {
     opacity: 1 !important;
     position: static !important;
     z-index: auto !important;
     visibility: visible !important;
   }
+
+  /* No rotation needed — direct output at correct orientation */
   .batch-print-portal .printable-label {
-    position: absolute !important;
+    position: relative !important;
     top: 0 !important;
     left: 0 !important;
-    width: 80mm !important;
-    height: 48mm !important;
-    /* چرخش حول نقطه (24mm, 24mm) برای قرارگیری بی‌نقص در کادر 48mm */
-    transform-origin: 24mm 24mm !important;
-    transform: rotate(90deg) !important;
-    /* خنثی کردن استایل‌های حالت چاپ تکی */
+    width: 72mm !important;
+    height: 40mm !important;
     margin: 0 !important;
   }
 }

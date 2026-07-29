@@ -1,66 +1,40 @@
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
-export const generateRotatedPdfBase64 = async (elements: HTMLElement[]): Promise<string> => {
-  const PAGE_WIDTH = 58;
-  const PAGE_HEIGHT = 78;
-  
+/**
+ * Generate a PDF from HTML label elements for thermal printing.
+ * Uses html-to-image instead of html2canvas to avoid oklch() color function errors
+ * that occur with Tailwind CSS v4.
+ *
+ * Outputs a landscape 72mm × 40mm PDF matching Woosim WSP-R350 specs.
+ * No software rotation is needed — the label is rendered directly at correct orientation.
+ */
+export const generatePdfBase64 = async (elements: HTMLElement[]): Promise<string> => {
+  const PAGE_WIDTH = 72;
+  const PAGE_HEIGHT = 40;
+
   const pdf = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
-    format: [PAGE_WIDTH, PAGE_HEIGHT]
+    format: [PAGE_WIDTH, PAGE_HEIGHT],
   });
 
   for (let i = 0; i < elements.length; i++) {
     const element = elements[i];
-    
-    // Scale 4 for crisp barcodes
-    console.log("Generating canvas for element:", element);
-    const canvas = await html2canvas(element, {
+
+    // Render with html-to-image (supports oklch and modern CSS)
+    const dataUrl = await toPng(element, {
       backgroundColor: '#ffffff',
-      scale: 4,
-      useCORS: true
+      pixelRatio: 4, // High DPI for crisp barcodes at 203 DPI
+      cacheBust: true,
     });
 
-    const rotatedCanvas = document.createElement('canvas');
-    rotatedCanvas.width = canvas.height;
-    rotatedCanvas.height = canvas.width;
-    const ctx = rotatedCanvas.getContext('2d');
-    
-    if (ctx) {
-      ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-      ctx.rotate(90 * Math.PI / 180);
-      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-      
-      const imgData = rotatedCanvas.toDataURL('image/png', 1.0);
-      
-      if (i > 0) {
-        pdf.addPage();
-      }
-      
-      // Calculate aspect ratio
-      const imgAspect = rotatedCanvas.width / rotatedCanvas.height;
-      const pageAspect = PAGE_WIDTH / PAGE_HEIGHT;
-      
-      let renderWidth = PAGE_WIDTH;
-      let renderHeight = PAGE_HEIGHT;
-      let x = 0;
-      let y = 0;
-      
-      if (imgAspect > pageAspect) {
-        // Image is wider than page (relatively)
-        renderWidth = PAGE_WIDTH;
-        renderHeight = renderWidth / imgAspect;
-        y = (PAGE_HEIGHT - renderHeight) / 2;
-      } else {
-        // Image is taller than page
-        renderHeight = PAGE_HEIGHT;
-        renderWidth = renderHeight * imgAspect;
-        x = (PAGE_WIDTH - renderWidth) / 2;
-      }
-      
-      pdf.addImage(imgData, 'PNG', x, y, renderWidth, renderHeight);
+    if (i > 0) {
+      pdf.addPage();
     }
+
+    // Fill the entire page with the label image
+    pdf.addImage(dataUrl, 'PNG', 0, 0, PAGE_WIDTH, PAGE_HEIGHT);
   }
 
   return pdf.output('datauristring').split(',')[1];

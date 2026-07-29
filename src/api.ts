@@ -53,9 +53,10 @@ export async function fetchSheetData(spreadsheetId: string): Promise<Product[]> 
 
   const processPrice = (val: string) => {
     if (!val) return '';
-    const num = Number(val.replace(/[^\d.-]/g, ''));
-    if (!isNaN(num) && val.replace(/[^\d.-]/g, '') !== '') {
-      return Math.floor(num / 10).toString();
+    // Strip non-numeric characters but preserve the original value (no division)
+    const cleaned = val.replace(/[^\d.-]/g, '');
+    if (cleaned !== '' && !isNaN(Number(cleaned))) {
+      return cleaned;
     }
     return val;
   };
