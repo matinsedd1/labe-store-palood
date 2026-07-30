@@ -33,27 +33,37 @@ export default function LoginModal({ spreadsheetId, onLoginSuccess }: LoginModal
       // Skip header row
       const headers = rows[0].map((h: string) => (h || '').trim().toLowerCase());
       
-      let roleIdx = headers.indexOf('role');
-      if (roleIdx === -1) roleIdx = headers.findIndex(h => h.includes('نقش'));
-      if (roleIdx === -1) roleIdx = 0; // fallback to user's layout
-
+      // Check headers or fallback to exact sheet layout (A=role, B=username, C=password)
       let userIdx = headers.indexOf('username');
       if (userIdx === -1) userIdx = headers.findIndex(h => h.includes('نام کاربری') || h.includes('کاربری'));
-      if (userIdx === -1) userIdx = 1;
+      if (userIdx === -1) userIdx = 1; // Col B in user sheet (username)
 
       let passIdx = headers.indexOf('password');
-      if (passIdx === -1) passIdx = headers.findIndex(h => h.includes('رمز'));
-      if (passIdx === -1) passIdx = 2;
+      if (passIdx === -1) passIdx = headers.findIndex(h => h.includes('رمز') || h.includes('pass'));
+      if (passIdx === -1) passIdx = 2; // Col C in user sheet (password)
+
+      let roleIdx = headers.indexOf('role');
+      if (roleIdx === -1) roleIdx = headers.findIndex(h => h.includes('نقش') || h.includes('role'));
+      if (roleIdx === -1) roleIdx = 0; // Col A in user sheet (role)
 
       let nameIdx = headers.indexOf('name');
       if (nameIdx === -1) nameIdx = headers.findIndex(h => h.includes('نام') && !h.includes('کاربری'));
-      if (nameIdx === -1) nameIdx = 3;
+      if (nameIdx === -1) nameIdx = 1; // Fallback to username
 
       const usersData = rows.slice(1);
       const matchedRow = usersData.find(row => {
-        const u = (row[userIdx] || '').trim().toLowerCase();
-        const p = (row[passIdx] || '').trim();
-        return u === username.trim().toLowerCase() && p === password.trim();
+        // Try matched userIdx/passIdx first
+        const u = (row[userIdx] || '').toString().trim().toLowerCase();
+        const p = (row[passIdx] || '').toString().trim();
+
+        if (u === username.trim().toLowerCase() && p === password.trim()) {
+          return true;
+        }
+
+        // Fallback check across all columns just in case
+        const isUserMatch = row.some((col: any) => col && col.toString().trim().toLowerCase() === username.trim().toLowerCase());
+        const isPassMatch = row.some((col: any) => col && col.toString().trim() === password.trim());
+        return isUserMatch && isPassMatch;
       });
 
       if (matchedRow) {
