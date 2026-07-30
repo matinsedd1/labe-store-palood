@@ -1,6 +1,9 @@
 import express from 'express';
 import path from 'path';
 import { google } from 'googleapis';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
@@ -54,6 +57,51 @@ app.get('/api/sheets/:spreadsheetId', async (req, res) => {
   }
 });
 
+app.get('/api/sheets/:spreadsheetId/users', async (req, res) => {
+  try {
+    const auth = getGoogleAuth();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const spreadsheetId = req.params.spreadsheetId;
+
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    const hasUsersSheet = spreadsheet.data.sheets?.some(s => s.properties?.title === 'Users');
+
+    if (!hasUsersSheet) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            addSheet: {
+              properties: { title: 'Users' }
+            }
+          }]
+        }
+      });
+      const defaultUsers = [
+        ['نام کاربری', 'رمز عبور', 'نام و نام خانوادگی', 'نقش'],
+        ['admin', 'admin123', 'مدیر سیستم', 'admin'],
+        ['operator', '1234', 'اپراتور انبار', 'operator']
+      ];
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: 'Users',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: defaultUsers }
+      });
+      return res.json(defaultUsers);
+    }
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Users',
+    });
+    res.json(response.data.values || []);
+  } catch (error: any) {
+    console.error('Sheets Users GET API Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch users' });
+  }
+});
+
 app.get('/api/sheets/:spreadsheetId/logs', async (req, res) => {
   try {
     const auth = getGoogleAuth();
@@ -68,7 +116,6 @@ app.get('/api/sheets/:spreadsheetId/logs', async (req, res) => {
       res.json(response.data.values || []);
     } catch (e: any) {
       if (e.message.includes('Unable to parse range')) {
-        // Sheet does not exist
         res.json([]);
       } else {
         throw e;
@@ -85,7 +132,7 @@ app.post('/api/sheets/:spreadsheetId/logs', async (req, res) => {
     const auth = getGoogleAuth();
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = req.params.spreadsheetId;
-    const { action, code, name, price } = req.body;
+    const { action, code, name, price, operator } = req.body;
 
     const timestamp = new Date().toLocaleString('fa-IR');
     
@@ -110,7 +157,7 @@ app.post('/api/sheets/:spreadsheetId/logs', async (req, res) => {
         range: 'System_Logs',
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: [['تاریخ و ساعت', 'نوع عملیات', 'کد کالا', 'نام کالا', 'قیمت فروش نهایی']]
+          values: [['تاریخ و ساعت', 'نوع عملیات', 'کد کالا', 'نام کالا', 'قیمت فروش نهایی', 'اپراتور']]
         }
       });
     }
@@ -120,7 +167,7 @@ app.post('/api/sheets/:spreadsheetId/logs', async (req, res) => {
       range: 'System_Logs',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[timestamp, action, code, name, price]]
+        values: [[timestamp, action, code, name, price, operator || 'ناشناس']]
       }
     });
 

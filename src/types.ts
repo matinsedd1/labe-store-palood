@@ -11,4 +11,13 @@ export interface Product {
   isOldPrice?: boolean; // نشان قیمت قدیم
 }
 
+export type Role = 'admin' | 'operator';
+
+export interface User {
+  username: string;
+  password?: string;
+  name: string;
+  role: Role;
+}
+
 export type Theme = 'light' | 'dark';

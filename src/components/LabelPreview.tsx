@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { generatePdfBase64 } from '../utils/pdfPrint';
 import { Product } from '../types';
 import { Printer, Loader2 } from 'lucide-react';
 import Barcode from 'react-barcode';
@@ -12,6 +11,7 @@ interface LabelPreviewProps {
   spreadsheetId?: string;
   onAddToQueue?: (product: Product, quantity: number) => void;
   isBatchPrinting?: boolean;
+  operatorName?: string;
 }
 
 
@@ -134,11 +134,11 @@ export const ThermalLabelUI = ({ product }: { product: Product }) => {
             {hasDiscount ? (
               <>
                 {/* Old Price */}
-                <div className="flex items-center gap-1 -mt-[2px] mb-0 pt-[3px]">
-                  <span className="text-[16px] font-medium text-black/70 leading-none line-through decoration-slate-600 decoration-2">
+                <div className="flex items-center gap-1 -mt-[2px] mb-0 pt-[2px]">
+                  <span className="text-[22px] font-bold text-black/80 leading-none line-through decoration-slate-700 decoration-2">
                     {formatPricePersian(product.consumerPrice)}
                   </span>
-                  <img src={tomanIcon} alt="تومان" className="w-[14px] h-[14px] object-contain opacity-60" />
+                  <img src={tomanIcon} alt="تومان" className="w-[18px] h-[18px] object-contain opacity-70" />
                 </div>
                 {/* New Price */}
                 <div className="flex items-center gap-1.5">
@@ -168,14 +168,14 @@ export const ThermalLabelUI = ({ product }: { product: Product }) => {
                 <div className="font-normal flex items-center justify-center shrink-0" dir="ltr">
                   <Barcode 
                      value={product.barcode.trim()} 
-                     format="CODE128"
-                     width={2} 
+                     format={/^\d{13}$/.test(product.barcode.trim()) ? "EAN13" : "CODE128"}
+                     width={/^\d{13}$/.test(product.barcode.trim()) ? 1.8 : 1.5} 
                      height={30} 
                      margin={1} 
                      background="transparent" 
                      lineColor="#000000"
                      displayValue={true}
-                     fontSize={10}
+                     fontSize={12}
                   />
                 </div>
               </div>
@@ -194,11 +194,10 @@ export const ThermalLabelUI = ({ product }: { product: Product }) => {
   );
 };
 
-export default function LabelPreview({ product, spreadsheetId, onAddToQueue, isBatchPrinting }: LabelPreviewProps) {
+export default function LabelPreview({ product, spreadsheetId, onAddToQueue, isBatchPrinting, operatorName }: LabelPreviewProps) {
   const [editableProduct, setEditableProduct] = useState<Product>(product);
   const [quantity, setQuantity] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [previewPdfBase64, setPreviewPdfBase64] = useState<string | null>(null);
 
   useEffect(() => {
     setEditableProduct(product);
@@ -208,67 +207,44 @@ const handlePrint = async () => {
     setIsPrinting(true);
     
     try {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const element = document.querySelector('#single-print-label-container .printable-label') as HTMLElement;
-        if (element) {
-          const pdfBase64 = await generatePdfBase64([element]);
-          setPreviewPdfBase64(pdfBase64);
-          setIsPrinting(false);
-        } else {
-           alert("Label element not found!");
-           setIsPrinting(false);
-        }
-      } else {
-        // Desktop single print
-        const label = document.querySelector('#single-print-label-container .printable-label');
-        if (label) {
-            const clone = label.cloneNode(true) as HTMLElement;
-            
-            // Create a wrapper similar to batch-print-portal
-            const wrapper = document.createElement('div');
-            wrapper.className = 'batch-print-portal batch-page-wrapper';
-            wrapper.style.position = 'static';
-            wrapper.style.visibility = 'visible';
-            wrapper.style.zIndex = '999999';
-            
-            wrapper.appendChild(clone);
-            document.body.appendChild(wrapper);
-            
-            document.body.classList.add('is-batch-printing'); // hides root
-            
-            setTimeout(() => {
-              window.print();
-              document.body.classList.remove('is-batch-printing');
-              document.body.removeChild(wrapper);
-              setIsPrinting(false);
-            }, 500);
-        } else {
+      const label = document.querySelector('#single-print-label-container .printable-label');
+      if (label) {
+          const clone = label.cloneNode(true) as HTMLElement;
+          
+          const wrapper = document.createElement('div');
+          wrapper.className = 'batch-print-portal batch-page-wrapper';
+          wrapper.style.position = 'static';
+          wrapper.style.visibility = 'visible';
+          wrapper.style.zIndex = '999999';
+          
+          wrapper.appendChild(clone);
+          document.body.appendChild(wrapper);
+          
+          document.body.classList.add('is-batch-printing');
+          
+          setTimeout(() => {
+            window.print();
+            document.body.classList.remove('is-batch-printing');
+            document.body.removeChild(wrapper);
             setIsPrinting(false);
-        }
+            
+            if (spreadsheetId) {
+              try {
+                appendLog(spreadsheetId, 'چاپ لیبل', editableProduct, operatorName).catch(err => {
+                  console.warn('Failed to log print action', err);
+                });
+              } catch (err) {
+                console.warn('Failed to log print action', err);
+              }
+            }
+          }, 500);
+      } else {
+          setIsPrinting(false);
       }
     } catch (err) {
       console.error('Print error:', err);
       alert("خطا در چاپ: " + String(err));
       setIsPrinting(false);
-    }
-  };
-
-  const handleConfirmMobilePrint = () => {
-    if (previewPdfBase64) {
-      window.location.href = "rawbt:base64," + previewPdfBase64;
-      setPreviewPdfBase64(null);
-      if (spreadsheetId) {
-        try {
-          appendLog(spreadsheetId, 'چاپ لیبل', editableProduct).catch(err => {
-            console.warn('Failed to log print action', err);
-          });
-        } catch (err) {
-          console.warn('Failed to log print action', err);
-        }
-      }
     }
   };
 
@@ -281,144 +257,131 @@ const handlePrint = async () => {
   const hasDiscount = sellingPriceNum > 0 && consumerPriceNum > 0 && sellingPriceNum < consumerPriceNum;
 
   return (
-    <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden h-full">
-      <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between print:hidden">
-        <h2 className="font-bold flex items-center gap-2">
-          <Printer className="w-5 h-5 text-blue-600" />
+    <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden h-full">
+      {/* Top Action Bar */}
+      <div className="bg-slate-50/80 dark:bg-slate-800/40 px-5 py-4 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4 print:hidden">
+        <h2 className="font-extrabold text-base flex items-center gap-2.5 text-slate-800 dark:text-white">
+          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <Printer className="w-5 h-5" />
+          </div>
           ویرایشگر لیبل حرارتی (72×40mm)
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 border border-slate-200 dark:border-slate-600">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 pl-1">تعداد:</span>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
+            <span className="text-xs font-bold text-slate-400">تعداد:</span>
             <input 
               type="number" 
               min="1"
               value={quantity}
               onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-12 h-8 text-center text-sm font-bold bg-white dark:bg-slate-800 border-none rounded-md outline-none"
+              className="w-10 h-7 text-center text-sm font-black bg-transparent border-none outline-none text-slate-800 dark:text-white"
             />
           </div>
+
           <button 
             onClick={() => {
               onAddToQueue?.(editableProduct, quantity);
-              setQuantity(1); // Reset after adding
+              setQuantity(1);
             }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all whitespace-nowrap"
+            className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm shadow-md transition-all whitespace-nowrap active:scale-95"
           >
             افزودن به صف
           </button>
+
           <button 
             onClick={() => handlePrint()}
             disabled={isPrinting}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow-md transition-all whitespace-nowrap flex items-center justify-center min-w-[100px]"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all whitespace-nowrap flex items-center justify-center min-w-[110px] active:scale-95 disabled:opacity-50"
           >
             {isPrinting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'چاپ سریع'}
           </button>
         </div>
       </div>
 
-      <div className="flex-1 bg-slate-200 dark:bg-slate-900 p-4 md:p-8 flex flex-col lg:flex-row gap-6 md:gap-8 overflow-y-auto print:bg-transparent print:p-0">
-        {/* Mobile Preview Modal */}
-        {previewPdfBase64 && (
-          <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-4 flex flex-col items-center">
-              <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-white text-center">
-                پیش‌نمایش چاپ
-              </h3>
-              
-              <div className="border border-slate-200 dark:border-slate-700 p-2 rounded-lg bg-slate-50 dark:bg-slate-900 mb-6 flex justify-center items-center w-full">
-                <iframe 
-                  src={`data:application/pdf;base64,${previewPdfBase64}#toolbar=0&navpanes=0&scrollbar=0`}
-                  className="w-[72mm] h-[40mm] bg-white shadow-sm mx-auto"
-                  title="PDF Preview"
-                />
-              </div>
+      {/* Main Content Area */}
+      <div className="flex-1 bg-slate-50/50 dark:bg-slate-950 p-4 lg:p-6 flex flex-col lg:flex-row gap-6 overflow-y-auto print:bg-transparent print:p-0">
 
-              <div className="flex gap-3 w-full">
-                <button 
-                  onClick={() => setPreviewPdfBase64(null)}
-                  className="flex-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors"
-                >
-                  انصراف
-                </button>
-                <button 
-                  onClick={handleConfirmMobilePrint}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm shadow-md transition-colors flex items-center justify-center gap-2"
-                >
-                  <Printer className="w-4 h-4" />
-                  ارسال به RawBT
-                </button>
-              </div>
-            </div>
+        {/* Live Preview Area - Displayed prominently */}
+        <div id="single-print-label-container" className={`w-full lg:w-1/2 flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-900 rounded-[24px] border border-slate-100 dark:border-slate-800 shadow-inner print:w-full print:block print:bg-transparent print:p-0 print:border-none ${isBatchPrinting ? 'print:hidden' : ''}`}>
+          <div className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 print:hidden tracking-wider uppercase">پیش‌نمایش خروجی چاپ</div>
+          <div className="p-3 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-xl print:p-0 print:bg-transparent print:border-none print:shadow-none">
+            <ThermalLabelUI product={editableProduct} />
           </div>
-        )}
+        </div>
 
-        {/* Editor Form - Hidden on print */}
-        <div id="label-editor-section" className="w-full lg:w-1/2 flex flex-col gap-4 print:hidden bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm h-fit">
+        {/* Editor Form */}
+        <div id="label-editor-section" className="w-full lg:w-1/2 flex flex-col gap-4 print:hidden bg-white dark:bg-slate-900 p-5 rounded-[24px] border border-slate-100 dark:border-slate-800 shadow-sm h-fit">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <span className="font-extrabold text-sm text-slate-800 dark:text-slate-200">مشخصات کالا</span>
+            <span className="text-[11px] font-medium text-slate-400">ویرایش زنده</span>
+          </div>
+
           <div>
-            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">نام کالا</label>
+            <label className="block text-xs font-bold mb-1.5 text-slate-500 dark:text-slate-400">نام کالا</label>
             <textarea 
               value={editableProduct.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none h-20"
+              className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl text-sm font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all resize-none h-20"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">قیمت فروش (تومان)</label>
+              <label className="block text-xs font-bold mb-1.5 text-slate-500 dark:text-slate-400">قیمت فروش (تومان)</label>
               <input 
                 type="text" 
                 value={editableProduct.sellingPrice}
                 onChange={(e) => handleChange('sellingPrice', e.target.value)}
-                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl text-sm font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 outline-none transition-all"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">قیمت مصرف‌کننده (تومان)</label>
+              <label className="block text-xs font-bold mb-1.5 text-slate-500 dark:text-slate-400">قیمت مصرف‌کننده (تومان)</label>
               <input 
                 type="text" 
                 value={editableProduct.consumerPrice}
                 onChange={(e) => handleChange('consumerPrice', e.target.value)}
-                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl text-sm font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 outline-none transition-all"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">درصد تخفیف</label>
+              <label className="block text-xs font-bold mb-1.5 text-slate-500 dark:text-slate-400">درصد تخفیف</label>
               <input 
                 type="text" 
                 value={editableProduct.discountPercentage}
                 onChange={(e) => handleChange('discountPercentage', e.target.value)}
-                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl text-sm font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 outline-none transition-all"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">کد کالا</label>
+              <label className="block text-xs font-bold mb-1.5 text-slate-500 dark:text-slate-400">کد کالا</label>
               <input 
                 type="text" 
                 value={editableProduct.code}
                 onChange={(e) => handleChange('code', e.target.value)}
-                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl text-sm font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 outline-none transition-all"
               />
             </div>
-            <div className="col-span-2 flex items-end gap-4">
+            <div className="col-span-2 flex items-center justify-between gap-4 pt-1">
               <div className="flex-1">
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">بارکد</label>
+                <label className="block text-xs font-bold mb-1.5 text-slate-500 dark:text-slate-400">بارکد</label>
                 <input 
                   type="text" 
                   value={editableProduct.barcode}
                   onChange={(e) => handleChange('barcode', e.target.value)}
-                  className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl text-sm font-mono font-bold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 outline-none transition-all"
                 />
               </div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mt-5 bg-slate-50 dark:bg-slate-800/60 px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
                 <input 
                   type="checkbox" 
                   id="isOldPrice"
                   checked={editableProduct.isOldPrice || false}
                   onChange={(e) => handleChange('isOldPrice', e.target.checked as any)}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                  className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
                 />
-                <label htmlFor="isOldPrice" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <label htmlFor="isOldPrice" className="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                   قیمت قدیم
                 </label>
               </div>
@@ -426,10 +389,6 @@ const handlePrint = async () => {
           </div>
         </div>
 
-        {/* Live Preview / Printable Label Area */}
-        <div id="single-print-label-container" className={`w-full lg:w-1/2 flex justify-center items-start print:w-full print:block overflow-x-auto pb-4 ${isBatchPrinting ? 'print:hidden' : ''}`}>
-          <ThermalLabelUI product={editableProduct} />
-        </div>
       </div>
     </div>
   );

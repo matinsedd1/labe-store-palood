@@ -27,14 +27,14 @@
 
   @page {
     size: 72mm 40mm;
-    margin: 0 !important;
+    margin: 0mm !important;
+    padding: 0mm !important;
   }
 
   html, body {
     width: 72mm !important;
-    height: auto !important;
-    min-height: 100% !important;
-    overflow: visible !important;
+    height: 40mm !important;
+    overflow: hidden !important;
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -54,9 +54,8 @@
 
   #root {
     width: 100% !important;
-    height: auto !important;
-    min-height: 100% !important;
-    overflow: visible !important;
+    height: 100% !important;
+    overflow: hidden !important;
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -134,7 +133,7 @@
     break-after: page !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow: visible !important;
+    overflow: hidden !important;
   }
 
   .batch-print-portal {

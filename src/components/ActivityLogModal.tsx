@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, RefreshCcw } from 'lucide-react';
+import { X, RefreshCcw, Download } from 'lucide-react';
 import { fetchLogs } from '../api';
+import { exportLogsToExcel } from '../utils/excelExporter';
 
 interface ActivityLogModalProps {
   spreadsheetId: string;
@@ -31,12 +32,33 @@ export default function ActivityLogModal({ spreadsheetId, onClose }: ActivityLog
     loadLogs();
   }, [spreadsheetId]);
 
+  const handleExport = () => {
+    const logObjects = logs.map(row => ({
+      timestamp: row[0],
+      action: row[1],
+      productCode: row[2],
+      productName: row[3],
+      sellingPrice: row[4],
+    }));
+    exportLogsToExcel(logObjects);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 print:hidden">
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="font-bold text-lg">تاریخچه چاپ و فعالیت‌ها</h2>
           <div className="flex items-center gap-2">
+            {logs.length > 0 && (
+              <button 
+                onClick={handleExport}
+                className="p-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md transition-colors flex items-center gap-1 text-xs font-bold px-3 dark:bg-emerald-900/40 dark:text-emerald-300"
+                title="دانلود اکسل"
+              >
+                <Download className="w-4 h-4" />
+                دانلود اکسل
+              </button>
+            )}
             <button onClick={loadLogs} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors" title="به‌روزرسانی">
               <RefreshCcw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -61,7 +83,8 @@ export default function ActivityLogModal({ spreadsheetId, onClose }: ActivityLog
                     <th className="px-4 py-2">نوع عملیات</th>
                     <th className="px-4 py-2">کد کالا</th>
                     <th className="px-4 py-2">نام کالا</th>
-                    <th className="px-4 py-2 rounded-l-lg">قیمت فروش نهایی</th>
+                    <th className="px-4 py-2">قیمت فروش</th>
+                    <th className="px-4 py-2 rounded-l-lg">اپراتور</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -80,6 +103,7 @@ export default function ActivityLogModal({ spreadsheetId, onClose }: ActivityLog
                       <td className="px-4 py-3 font-mono">{row[2]}</td>
                       <td className="px-4 py-3 max-w-[200px] truncate" title={row[3]}>{row[3]}</td>
                       <td className="px-4 py-3">{row[4]}</td>
+                      <td className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300">{row[5] || 'سیستم'}</td>
                     </tr>
                   ))}
                 </tbody>
