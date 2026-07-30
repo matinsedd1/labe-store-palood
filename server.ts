@@ -64,27 +64,31 @@ app.get('/api/sheets/:spreadsheetId/users', async (req, res) => {
     const spreadsheetId = req.params.spreadsheetId;
 
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-    const hasUsersSheet = spreadsheet.data.sheets?.some(s => s.properties?.title === 'Users');
+    const usersSheet = spreadsheet.data.sheets?.find(s => 
+      s.properties?.title?.trim().toLowerCase() === 'users'
+    );
 
-    if (!hasUsersSheet) {
+    const sheetTitle = usersSheet?.properties?.title || 'users';
+
+    if (!usersSheet) {
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
           requests: [{
             addSheet: {
-              properties: { title: 'Users' }
+              properties: { title: 'users' }
             }
           }]
         }
       });
       const defaultUsers = [
-        ['نام کاربری', 'رمز عبور', 'نام و نام خانوادگی', 'نقش'],
-        ['admin', 'admin123', 'مدیر سیستم', 'admin'],
-        ['operator', '1234', 'اپراتور انبار', 'operator']
+        ['role', 'username', 'password'],
+        ['admin', 'modir', '302010'],
+        ['operator', 'ferdosi', '102030']
       ];
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: 'Users',
+        range: 'users',
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: defaultUsers }
       });
@@ -93,7 +97,7 @@ app.get('/api/sheets/:spreadsheetId/users', async (req, res) => {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Users',
+      range: sheetTitle,
     });
     res.json(response.data.values || []);
   } catch (error: any) {

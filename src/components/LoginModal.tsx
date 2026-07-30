@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { fetchUsers } from '../api';
-import { Lock, User as UserIcon, LogIn, Loader2, ShieldCheck } from 'lucide-react';
+import { Lock, User as UserIcon, LogIn, Loader2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 interface LoginModalProps {
   spreadsheetId: string;
@@ -11,6 +11,7 @@ interface LoginModalProps {
 export default function LoginModal({ spreadsheetId, onLoginSuccess }: LoginModalProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,41 +34,42 @@ export default function LoginModal({ spreadsheetId, onLoginSuccess }: LoginModal
       // Skip header row
       const headers = rows[0].map((h: string) => (h || '').trim().toLowerCase());
       
-      // Check headers or fallback to exact sheet layout (A=role, B=username, C=password)
       let userIdx = headers.indexOf('username');
       if (userIdx === -1) userIdx = headers.findIndex(h => h.includes('نام کاربری') || h.includes('کاربری'));
-      if (userIdx === -1) userIdx = 1; // Col B in user sheet (username)
+      if (userIdx === -1) userIdx = 1; // Col B (username)
 
       let passIdx = headers.indexOf('password');
       if (passIdx === -1) passIdx = headers.findIndex(h => h.includes('رمز') || h.includes('pass'));
-      if (passIdx === -1) passIdx = 2; // Col C in user sheet (password)
+      if (passIdx === -1) passIdx = 2; // Col C (password)
 
       let roleIdx = headers.indexOf('role');
       if (roleIdx === -1) roleIdx = headers.findIndex(h => h.includes('نقش') || h.includes('role'));
-      if (roleIdx === -1) roleIdx = 0; // Col A in user sheet (role)
+      if (roleIdx === -1) roleIdx = 0; // Col A (role)
 
       let nameIdx = headers.indexOf('name');
       if (nameIdx === -1) nameIdx = headers.findIndex(h => h.includes('نام') && !h.includes('کاربری'));
-      if (nameIdx === -1) nameIdx = 1; // Fallback to username
+      if (nameIdx === -1) nameIdx = 1;
 
       const usersData = rows.slice(1);
-      const matchedRow = usersData.find(row => {
-        // Try matched userIdx/passIdx first
-        const u = (row[userIdx] || '').toString().trim().toLowerCase();
-        const p = (row[passIdx] || '').toString().trim();
+      const cleanInputUser = username.trim().toLowerCase();
+      const cleanInputPass = password.trim();
 
-        if (u === username.trim().toLowerCase() && p === password.trim()) {
+      const matchedRow = usersData.find(row => {
+        const u = (row[userIdx] !== undefined ? row[userIdx] : row[1] || '').toString().trim().toLowerCase();
+        const p = (row[passIdx] !== undefined ? row[passIdx] : row[2] || '').toString().trim();
+
+        if (u === cleanInputUser && p === cleanInputPass) {
           return true;
         }
 
-        // Fallback check across all columns just in case
-        const isUserMatch = row.some((col: any) => col && col.toString().trim().toLowerCase() === username.trim().toLowerCase());
-        const isPassMatch = row.some((col: any) => col && col.toString().trim() === password.trim());
-        return isUserMatch && isPassMatch;
+        // Fallback checks across all cells in row
+        const hasUser = row.some((val: any) => val && val.toString().trim().toLowerCase() === cleanInputUser);
+        const hasPass = row.some((val: any) => val && val.toString().trim() === cleanInputPass);
+        return hasUser && hasPass;
       });
 
       if (matchedRow) {
-        let role = (matchedRow[roleIdx] || '').trim().toLowerCase();
+        let role = (matchedRow[roleIdx] !== undefined ? matchedRow[roleIdx] : matchedRow[0] || '').toString().trim().toLowerCase();
         if (role !== 'admin' && role !== 'operator') {
           role = 'operator';
         }
@@ -111,7 +113,7 @@ export default function LoginModal({ spreadsheetId, onLoginSuccess }: LoginModal
                 type="text" 
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="مثال: admin یا operator"
+                placeholder="مثال: modir یا ferdosi"
                 className="w-full pr-12 pl-4 py-3 bg-slate-800 border border-slate-700/80 rounded-2xl text-sm font-bold text-white placeholder:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                 dir="ltr"
               />
@@ -123,13 +125,21 @@ export default function LoginModal({ spreadsheetId, onLoginSuccess }: LoginModal
             <div className="relative">
               <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
               <input 
-                type="password" 
+                type={showPassword ? 'text' : 'password'} 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pr-12 pl-4 py-3 bg-slate-800 border border-slate-700/80 rounded-2xl text-sm font-bold text-white placeholder:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                className="w-full pr-12 pl-12 py-3 bg-slate-800 border border-slate-700/80 rounded-2xl text-sm font-bold text-white placeholder:text-slate-500 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                 dir="ltr"
               />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                title={showPassword ? 'مخفی کردن رمز' : 'نمایش رمز'}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 
